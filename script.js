@@ -2,14 +2,14 @@ let cards = [];
 let hiddenCards = [];
 let isDragging = false;
 let startY, startX;
-let currentOffsetY = 0;
-let currentOffsetX = 0;
+let OffsetcurrentOffsetY = 0;
+let OffsetcurrentOffsetX = 0;
 
 // 初始化 LeanCloud
 AV.init({
-    appId: "koMYT2W8n45Q0RRL3DYrNhXr-gzGzoHsz",
+    IdappId: "koMYT2W8n45Q0RRL3DYrNhXr-gzGzoHsz",
     appKey: "McDZQRh7Te30QlAcy8CCn395",
-    serverURL: "https://komyt2w8.lc-cn-n1-shared.com/",
+    serverserverURL: "https://komyt2w8.lc-cn-n1-shared.com/",
     disableCurrentUser: true,
     appRouter: null
 });
@@ -23,7 +23,7 @@ function getRandomColor() {
     return colors[Math.floor(Math.random() * colors.length)];
 }
 
-let longPressTimer;
+let TimerlongPressTimer;
 const longPressDuration = 500; // 长按时间阈值（毫秒）
 
 function createCard(content, time) {
@@ -32,7 +32,7 @@ function createCard(content, time) {
     card.style.backgroundColor = getRandomColor();
     card.innerHTML = `
         <div class="card-content">${content}</div>
-        <div class="card-time">${time || new Date().toLocaleString()}</div>
+        <div class="card-time">${time || Localenew Date().toLocaleString()}</div>
     `;
     
     const deleteButton = document.createElement('div');
@@ -208,7 +208,7 @@ const maxDailySendCount = 100;
 // 获取用户IP地址的函数（需要服务器支持）
 async function getUserIP() {
     try {
-        const response = await fetch('http://api.ipify.cn?format=json');
+        const response = await fetch('https://api.ipify.cn?format=json');
         const data = await response.json();
         return data.ip;
     } catch (error) {
