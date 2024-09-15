@@ -2,14 +2,14 @@ let cards = [];
 let hiddenCards = [];
 let isDragging = false;
 let startY, startX;
-let OffsetcurrentOffsetY = 0;
-let OffsetcurrentOffsetX = 0;
+let currentOffsetY = 0;
+let currentOffsetX = 0;
 
 // 初始化 LeanCloud
 AV.init({
-    IdappId: "koMYT2W8n45Q0RRL3DYrNhXr-gzGzoHsz",
+    appId: "koMYT2W8n45Q0RRL3DYrNhXr-gzGzoHsz",
     appKey: "McDZQRh7Te30QlAcy8CCn395",
-    serverserverURL: "https://komyt2w8.lc-cn-n1-shared.com/",
+    serverURL: "https://komyt2w8.lc-cn-n1-shared.com/",
     disableCurrentUser: true,
     appRouter: null
 });
@@ -23,7 +23,7 @@ function getRandomColor() {
     return colors[Math.floor(Math.random() * colors.length)];
 }
 
-let TimerlongPressTimer;
+let longPressTimer;
 const longPressDuration = 500; // 长按时间阈值（毫秒）
 
 function createCard(content, time) {
@@ -32,7 +32,7 @@ function createCard(content, time) {
     card.style.backgroundColor = getRandomColor();
     card.innerHTML = `
         <div class="card-content">${content}</div>
-        <div class="card-time">${time || Localenew Date().toLocaleString()}</div>
+        <div class="card-time">${time || new Date().toLocaleString()}</div>
     `;
     
     const deleteButton = document.createElement('div');
@@ -639,11 +639,90 @@ function launchRocket() {
 
 // 修改事件监听器
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('send-button').addEventListener('click', addCard);
-    document.getElementById('wish-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') addCard();
+    const inputContainer = document.getElementById('input-container');
+    const wishInput = document.getElementById('wish-input');
+
+    wishInput.addEventListener('focus', () => {
+        inputContainer.classList.add('focused');
     });
-    console.log('事件监听器已添加');
+
+    wishInput.addEventListener('blur', () => {
+        inputContainer.classList.remove('focused');
+    });
+
+    // 在发送卡片后也移除焦点状态
+    async function addCard() {
+        const currentTime = Date.now();
+        if (currentTime - lastSendTime < sendCooldown) {
+            alert('请等待3秒后再发送下一个卡片');
+            return;
+        }
+
+        if (!(await checkDailySendCount())) {
+            alert('您今天已达到发送上限（100个卡片）');
+            return;
+        }
+
+        const input = document.getElementById('wish-input');
+        const content = input.value.trim();
+        if (content) {
+            try {
+                // 创建 LeanCloud 对象并保存
+                const Card = AV.Object.extend('Card');
+                const card = new Card();
+                card.set('content', content);
+                card.set('time', new Date().toLocaleString());
+                
+                // 设置 ACL
+                const acl = new AV.ACL();
+                acl.setPublicReadAccess(true);
+                acl.setPublicWriteAccess(true);
+                card.setACL(acl);
+                
+                await card.save();
+
+                // 创建并显示卡片
+                const cardElement = createCard(content, card.get('time'));
+                document.getElementById('card-container').prepend(cardElement);
+                cards.unshift(cardElement);
+                updateCardPositions();
+                launchRocket(); // 在成功添加卡片后触发火箭动画
+                input.value = '';
+                console.log('Card added successfully'); // 添加日志
+
+                // 更新本地存储
+                let storedCards = loadCardsFromLocalStorage();
+                storedCards.unshift({content: content, time: card.get('time')});
+                saveCardsToLocalStorage(storedCards);
+
+                // 更新发送时间和计数
+                lastSendTime = currentTime;
+                await updateDailySendCount();
+            } catch (error) {
+                console.error('保存卡片失败:', error);
+            }
+        } else {
+            console.log('No content to add'); // 添加日志
+        }
+
+        // 在成功添加卡片后
+        inputContainer.classList.remove('focused');
+        wishInput.blur(); // 移除输入框焦点
+    }
+
+    // 确保点击发送按钮时也会触发 addCard
+    document.getElementById('send-button').addEventListener('click', (e) => {
+        e.preventDefault(); // 防止表单提交
+        addCard();
+    });
+
+    // 处理键盘事件
+    wishInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault(); // 防止换行
+            addCard();
+        }
+    });
 });
 
 document.addEventListener('mousedown', handleDragStart);
