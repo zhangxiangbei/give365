@@ -96,6 +96,10 @@ body {
     border-radius: 20px;
     cursor: pointer;
     white-space: nowrap; /* 防止按钮文字换行 */
+    user-select: none; /* 防止文字被选中 */
+    -webkit-user-select: none; /* 针对 Safari 的兼容性 */
+    -moz-user-select: none; /* 针对 Firefox 的兼容性 */
+    -ms-user-select: none; /* 针对旧版 IE 的兼容性 */
 }
 
 .confetti {

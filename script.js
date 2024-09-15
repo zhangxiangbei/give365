@@ -563,9 +563,39 @@ function checkLoadMore() {
     }
 }
 
+async function loadNewCards() {
+    try {
+        const latestCardTime = cards.length > 0 ? cards[0].querySelector('.card-time').textContent : null;
+        const query = new AV.Query('Card');
+        query.descending('createdAt');
+        if (latestCardTime) {
+            query.greaterThan('createdAt', new Date(latestCardTime));
+        }
+        const newCards = await query.find();
+
+        if (newCards.length > 0) {
+            for (let cardData of newCards) {
+                const content = cardData.get('content');
+                const time = cardData.get('time');
+                const card = createCard(content, time);
+                document.getElementById('card-container').prepend(card);
+                cards.unshift(card);
+            }
+            updateCardPositions();
+            console.log(`新卡片加载完成，总数：${cards.length}`);
+        } else {
+            console.log('没有新卡片');
+        }
+    } catch (error) {
+        console.error('加载新卡片失败:', error);
+    }
+}
+
+// 修改 initializeApp 函数
 async function initializeApp() {
     changeBackgroundColor();
     await loadCards(); // 初始加载第一页
+    await loadNewCards(); // 加载新卡片
     console.log('应用初始化完成');
 }
 
