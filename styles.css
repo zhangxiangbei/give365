@@ -1,0 +1,343 @@
+body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    overflow: hidden;
+}
+
+#background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transition: background 0.5s ease;
+}
+
+#card-container {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    perspective: 1000px;
+    height: 70vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.card {
+    position: absolute;
+    width: 300px;
+    height: 200px;
+    background: #ffffa5; /* 默认颜色，将在 JavaScript 中动态更改 */
+    border-radius: 20px;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    backface-visibility: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+.card-content {
+    text-align: center;
+    font-size: 18px;
+    color: #333;
+}
+
+.card-time {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    font-size: 12px;
+    color: #666;
+}
+
+#input-container {
+    position: fixed;
+    bottom: 20px; /* 增加底部距离 */
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    width: 90%; /* 限制宽度，防止在小屏幕上太宽 */
+    max-width: 500px; /* 最大宽度 */
+    padding: 10px; /* 添加内边距 */
+    background-color: rgba(255, 255, 255, 0.8); /* 半透明背景 */
+    border-radius: 20px; /* 圆角 */
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* 添加阴影 */
+}
+
+#wish-input {
+    flex-grow: 1; /* 让输入框占据剩余空间 */
+    padding: 10px;
+    font-size: 16px;
+    border: none;
+    border-radius: 20px;
+    outline: none;
+}
+
+#send-button {
+    padding: 10px 20px;
+    font-size: 16px;
+    background-color: #007AFF;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    white-space: nowrap; /* 防止按钮文字换行 */
+}
+
+.confetti {
+    position: fixed;
+    opacity: 0;
+    animation: confetti-burst 3s ease-out forwards;
+}
+
+.confetti-circle {
+    border-radius: 50%;
+}
+
+.confetti-rectangle {
+    width: 8px;
+    height: 16px;
+}
+
+.confetti-triangle {
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 12px solid;
+    background-color: transparent !important;
+}
+
+.confetti-star {
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+
+.confetti-heart {
+    width: 10px;
+    height: 10px;
+    background-color: red;
+    transform: rotate(-45deg);
+    position: relative;
+}
+
+.confetti-heart:before,
+.confetti-heart:after {
+    content: "";
+    width: 10px;
+    height: 10px;
+    background-color: red;
+    border-radius: 50%;
+    position: absolute;
+}
+
+.confetti-heart:before {
+    top: -5px;
+    left: 0;
+}
+
+.confetti-heart:after {
+    top: 0;
+    left: 5px;
+}
+
+@keyframes confetti-burst {
+    0% {
+        transform: scale(0) rotate(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1) translate(var(--tx), var(--ty)) rotate(var(--tr));
+        opacity: 0;
+    }
+}
+
+@keyframes confetti-sway {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(var(--sx)); }
+}
+
+@keyframes confetti-shake {
+    0%, 100% { margin-left: 0; }
+    25% { margin-left: -5px; }
+    75% { margin-left: 5px; }
+}
+
+.delete-button {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 20px;
+    height: 20px;
+    background-color: rgba(255, 0, 0, 0.7);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+}
+
+.delete-button:hover {
+    background-color: rgba(255, 0, 0, 1);
+}
+
+.apple-celebration {
+    position: fixed;
+    opacity: 0;
+    animation: apple-celebration 1.5s ease-out forwards;
+}
+
+.celebration-triangle::after {
+    content: '▲';
+}
+
+.celebration-star::after {
+    content: '★';
+}
+
+.celebration-heart::after {
+    content: '♥';
+}
+
+.celebration-trumpet::after {
+    content: '🎺';
+}
+
+.celebration-celebration::after {
+    content: '🎉';
+}
+
+@keyframes apple-celebration {
+    0% {
+        transform: scale(0) rotate(0deg);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.2) rotate(180deg);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1) rotate(360deg);
+        opacity: 0;
+    }
+}
+
+@keyframes confetti-sway {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(var(--sx)); }
+}
+
+@keyframes confetti-shake {
+    0%, 100% { margin-left: 0; }
+    25% { margin-left: -5px; }
+    75% { margin-left: 5px; }
+}
+
+.rocket-gif {
+    position: fixed;
+    bottom: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 99px; /* 卡片宽度的33%，假设卡片宽度为300px */
+    height: auto;
+    z-index: 1001;
+    animation: rocketLaunch 3s cubic-bezier(0.47, 0, 0.745, 0.715) forwards;
+}
+
+@keyframes rocketLaunch {
+    0% {
+        bottom: -100px;
+        transform: translateX(-50%) scale(1);
+    }
+    20% { /* 缓冲期 */
+        bottom: 0;
+        transform: translateX(-50%) scale(1);
+    }
+    100% {
+        bottom: 120%;
+        transform: translateX(-50%) scale(0.5) rotate(5deg);
+    }
+}
+
+.star {
+    position: fixed;
+    background: white;
+    border-radius: 50%;
+    animation: twinkle 1s infinite alternate;
+    z-index: 1000;
+}
+
+@keyframes twinkle {
+    0% { opacity: 0.3; }
+    100% { opacity: 1; }
+}
+
+.moon {
+    position: fixed;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: #FFFF99;
+    box-shadow: 0 0 20px #FFFF99;
+    z-index: 1000;
+}
+
+.shooting-star {
+    position: fixed;
+    width: 2px;
+    height: 2px;
+    background: white;
+    animation: shoot 1s linear;
+    z-index: 1000;
+}
+
+@keyframes shoot {
+    0% { transform: translateX(0) translateY(0); }
+    100% { transform: translateX(-100px) translateY(100px); }
+}
+
+.shake {
+    animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes shake {
+    10%, 90% {
+        transform: translate3d(-1px, 0, 0);
+    }
+    20%, 80% {
+        transform: translate3d(2px, 0, 0);
+    }
+    30%, 50%, 70% {
+        transform: translate3d(-4px, 0, 0);
+    }
+    40%, 60% {
+        transform: translate3d(4px, 0, 0);
+    }
+}
+
+/* 适配小屏幕设备 */
+@media (max-width: 480px) {
+    #input-container {
+        bottom: 10px;
+        width: 95%;
+    }
+
+    #wish-input {
+        font-size: 14px;
+    }
+
+    #send-button {
+        padding: 10px 15px;
+        font-size: 14px;
+    }
+}
