@@ -9,11 +9,9 @@ let currentOffsetX = 0;
 AV.init({
     appId: "koMYT2W8n45Q0RRL3DYrNhXr-gzGzoHsz",
     appKey: "McDZQRh7Te30QlAcy8CCn395",
-    serverURL: "https://komyt2w8.lc-cn-n1-shared.com/",
-    disableCurrentUser: true,
-    appRouter: null
+    serverURL: "https://komyt2w8.lc-cn-n1-shared.com/"
 });
-console.log('LeanCloud initialized'); // 添加日志
+console.log('LeanCloud initialized');
 
 function getRandomColor() {
     const colors = [
@@ -26,7 +24,7 @@ function getRandomColor() {
 let longPressTimer;
 const longPressDuration = 500; // 长按时间阈值（毫秒）
 
-function createCard(content, time) {
+function createCard(content, time, objectId) {
     const card = document.createElement('div');
     card.className = 'card';
     card.style.backgroundColor = getRandomColor();
@@ -40,6 +38,9 @@ function createCard(content, time) {
         </div>
         <div class="card-time">${time || new Date().toLocaleString()}</div>
     `;
+    
+    // 存储 objectId
+    card.dataset.objectId = objectId;
     
     const deleteButton = document.createElement('div');
     deleteButton.className = 'delete-button';
@@ -172,12 +173,9 @@ async function deleteCard(card, user) {
             console.log('尝试删除卡片:', card.querySelector('.card-content').textContent);
             
             // 从 LeanCloud 删除数据
-            const query = new AV.Query('Card');
-            query.equalTo('content', card.querySelector('.card-content').textContent);
-            query.equalTo('time', card.querySelector('.card-time').textContent);
-            const cardObject = await query.first();
-            if (cardObject) {
-                console.log('在 LeanCloud 中找到卡片，尝试删除');
+            const objectId = card.dataset.objectId;
+            if (objectId) {
+                const cardObject = AV.Object.createWithoutData('Card', objectId);
                 await cardObject.destroy({ user: user });
                 console.log('卡片已从 LeanCloud 成功删除');
             } else {
@@ -191,10 +189,7 @@ async function deleteCard(card, user) {
 
             // 从本地存储中删除卡片
             let storedCards = loadCardsFromLocalStorage();
-            storedCards = storedCards.filter(storedCard => 
-                storedCard.content !== card.querySelector('.card-content').textContent ||
-                storedCard.time !== card.querySelector('.card-time').textContent
-            );
+            storedCards = storedCards.filter(storedCard => storedCard.objectId !== objectId);
             saveCardsToLocalStorage(storedCards);
 
             console.log('卡片已在本地删除');
@@ -344,10 +339,11 @@ async function addCard() {
             acl.setPublicWriteAccess(true);
             card.setACL(acl);
             
-            await card.save();
+            const savedCard = await card.save();
+            const objectId = savedCard.id;
 
             // 创建并显示卡片
-            const cardElement = createCard(content, currentTime);
+            const cardElement = createCard(content, currentTime, objectId);
             document.getElementById('card-container').prepend(cardElement);
             cards.unshift(cardElement);
             
@@ -358,7 +354,7 @@ async function addCard() {
 
             // 更新本地存储
             let storedCards = loadCardsFromLocalStorage();
-            storedCards.unshift({content: content, time: currentTime});
+            storedCards.unshift({content: content, time: currentTime, objectId: objectId});
             saveCardsToLocalStorage(storedCards);
 
             // 更新发送时间和计数
@@ -576,7 +572,8 @@ async function loadCards(page = 0) {
 
             const newCards = results.map(card => ({
                 content: card.get('content'),
-                time: card.get('time')
+                time: card.get('time'),
+                objectId: card.id
             }));
             storedCards = storedCards.concat(newCards);
             saveCardsToLocalStorage(storedCards);
@@ -598,10 +595,11 @@ async function loadCards(page = 0) {
         for (let cardData of results) {
             const content = cardData.get ? cardData.get('content') : cardData.content;
             const time = cardData.get ? cardData.get('time') : cardData.time;
+            const objectId = cardData.id || cardData.objectId;
             
             // 如果这个时间点还没有被添加过，则添加卡片
             if (!uniqueTimes.has(time)) {
-                const card = createCard(content, time);
+                const card = createCard(content, time, objectId);
                 document.getElementById('card-container').appendChild(card);
                 cards.push(card);
                 uniqueTimes.add(time);
@@ -641,9 +639,10 @@ async function loadNewCards() {
             for (let cardData of newCards) {
                 const content = cardData.get('content');
                 const time = cardData.get('time');
+                const objectId = cardData.id;
                 
                 if (!uniqueTimes.has(time)) {
-                    const card = createCard(content, time);
+                    const card = createCard(content, time, objectId);
                     document.getElementById('card-container').prepend(card);
                     cards.unshift(card);
                     uniqueTimes.add(time);
@@ -765,11 +764,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const content = input.value.trim();
         if (content) {
             try {
+                const currentTime = new Date().toLocaleString();
+                
+                // 检查是否已存在相同时间的卡片
+                const existingCard = cards.find(card => card.querySelector('.card-time').textContent === currentTime);
+                if (existingCard) {
+                    alert('该时间点已存在卡片，请稍后再试');
+                    return;
+                }
+
                 // 创建 LeanCloud 对象并保存
                 const Card = AV.Object.extend('Card');
                 const card = new Card();
                 card.set('content', content);
-                const currentTime = new Date().toLocaleString();
                 card.set('time', currentTime);
                 
                 // 设置 ACL
@@ -778,19 +785,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 acl.setPublicWriteAccess(true);
                 card.setACL(acl);
                 
-                await card.save();
+                const savedCard = await card.save();
+                const objectId = savedCard.id;
 
                 // 创建并显示卡片
-                const cardElement = createCard(content, currentTime);
+                const cardElement = createCard(content, currentTime, objectId);
                 document.getElementById('card-container').prepend(cardElement);
                 cards.unshift(cardElement);
-                
-                // 确保卡片按时间倒序排列
-                cards.sort((a, b) => {
-                    const timeA = new Date(a.querySelector('.card-time').textContent);
-                    const timeB = new Date(b.querySelector('.card-time').textContent);
-                    return timeB - timeA;
-                });
                 
                 updateCardPositions();
                 launchRocket(); // 在成功添加卡片后触发火箭动画
@@ -799,7 +800,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // 更新本地存储
                 let storedCards = loadCardsFromLocalStorage();
-                storedCards.unshift({content: content, time: currentTime});
+                storedCards.unshift({content: content, time: currentTime, objectId: objectId});
                 saveCardsToLocalStorage(storedCards);
 
                 // 更新发送时间和计数
@@ -831,6 +832,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
 
 document.addEventListener('mousedown', handleDragStart);
 document.addEventListener('mousemove', handleDragMove);
