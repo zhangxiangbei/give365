@@ -30,8 +30,14 @@ function createCard(content, time) {
     const card = document.createElement('div');
     card.className = 'card';
     card.style.backgroundColor = getRandomColor();
+    
+    // 使用 marked 解析 Markdown
+    const parsedContent = marked.parse(content);
+    
     card.innerHTML = `
-        <div class="card-content">${content}</div>
+        <div class="card-content-wrapper">
+            <div class="card-content">${parsedContent}</div>
+        </div>
         <div class="card-time">${time || new Date().toLocaleString()}</div>
     `;
     
@@ -40,6 +46,38 @@ function createCard(content, time) {
     deleteButton.textContent = '×';
     deleteButton.style.display = 'none';
     card.appendChild(deleteButton);
+    
+    // 处理图片
+    const images = card.querySelectorAll('.card-content img');
+    if (images.length === 0) {
+        // 如果没有图片，将文字居中
+        card.querySelector('.card-content-wrapper').style.display = 'flex';
+        card.querySelector('.card-content-wrapper').style.alignItems = 'center';
+        card.querySelector('.card-content-wrapper').style.justifyContent = 'center';
+    } else {
+        images.forEach((img, index) => {
+            img.style.maxWidth = '75px';
+            img.style.maxHeight = '75px';
+            img.style.objectFit = 'cover';
+            img.style.cursor = 'pointer';
+            img.style.margin = '5px 5px 0 0';
+            img.style.borderRadius = '5px';
+            img.style.verticalAlign = 'bottom';
+            img.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showImageModal(images, index);
+            });
+        });
+    }
+    
+    // 检查内容是否超出卡片高度，如果是，添加滚动动画
+    setTimeout(() => {
+        const contentWrapper = card.querySelector('.card-content-wrapper');
+        const content = card.querySelector('.card-content');
+        if (content.offsetHeight > contentWrapper.offsetHeight) {
+            content.style.animation = 'scrollText 20s linear infinite';
+        }
+    }, 100);
     
     card.addEventListener('mousedown', (e) => startLongPress(e, card));
     card.addEventListener('mouseup', cancelLongPress);
@@ -283,7 +321,8 @@ async function addCard() {
             const Card = AV.Object.extend('Card');
             const card = new Card();
             card.set('content', content);
-            card.set('time', new Date().toLocaleString());
+            const currentTime = new Date().toLocaleString();
+            card.set('time', currentTime);
             
             // 设置 ACL
             const acl = new AV.ACL();
@@ -294,9 +333,17 @@ async function addCard() {
             await card.save();
 
             // 创建并显示卡片
-            const cardElement = createCard(content, card.get('time'));
+            const cardElement = createCard(content, currentTime);
             document.getElementById('card-container').prepend(cardElement);
             cards.unshift(cardElement);
+            
+            // 确保卡片按时间倒序排列
+            cards.sort((a, b) => {
+                const timeA = new Date(a.querySelector('.card-time').textContent);
+                const timeB = new Date(b.querySelector('.card-time').textContent);
+                return timeB - timeA;
+            });
+            
             updateCardPositions();
             launchRocket(); // 在成功添加卡片后触发火箭动画
             input.value = '';
@@ -304,7 +351,7 @@ async function addCard() {
 
             // 更新本地存储
             let storedCards = loadCardsFromLocalStorage();
-            storedCards.unshift({content: content, time: card.get('time')});
+            storedCards.unshift({content: content, time: currentTime});
             saveCardsToLocalStorage(storedCards);
 
             // 更新发送时间和计数
@@ -522,10 +569,11 @@ async function loadCards(page = 0) {
             results = await query.find();
 
             // 将新卡片添加到本地存储
-            storedCards = storedCards.concat(results.map(card => ({
+            const newCards = results.map(card => ({
                 content: card.get('content'),
                 time: card.get('time')
-            })));
+            }));
+            storedCards = storedCards.concat(newCards);
             saveCardsToLocalStorage(storedCards);
         }
 
@@ -547,6 +595,14 @@ async function loadCards(page = 0) {
             document.getElementById('card-container').appendChild(card);
             cards.push(card);
         }
+        
+        // 确保卡片按时间倒序排列
+        cards.sort((a, b) => {
+            const timeA = new Date(a.querySelector('.card-time').textContent);
+            const timeB = new Date(b.querySelector('.card-time').textContent);
+            return timeB - timeA;
+        });
+        
         updateCardPositions();
         console.log(`卡片加载完成，当前页：${page + 1}，总数：${cards.length}`);
         currentPage = page;
@@ -701,7 +757,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const Card = AV.Object.extend('Card');
                 const card = new Card();
                 card.set('content', content);
-                card.set('time', new Date().toLocaleString());
+                const currentTime = new Date().toLocaleString();
+                card.set('time', currentTime);
                 
                 // 设置 ACL
                 const acl = new AV.ACL();
@@ -712,9 +769,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 await card.save();
 
                 // 创建并显示卡片
-                const cardElement = createCard(content, card.get('time'));
+                const cardElement = createCard(content, currentTime);
                 document.getElementById('card-container').prepend(cardElement);
                 cards.unshift(cardElement);
+                
+                // 确保卡片按时间倒序排列
+                cards.sort((a, b) => {
+                    const timeA = new Date(a.querySelector('.card-time').textContent);
+                    const timeB = new Date(b.querySelector('.card-time').textContent);
+                    return timeB - timeA;
+                });
+                
                 updateCardPositions();
                 launchRocket(); // 在成功添加卡片后触发火箭动画
                 input.value = '';
@@ -722,7 +787,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // 更新本地存储
                 let storedCards = loadCardsFromLocalStorage();
-                storedCards.unshift({content: content, time: card.get('time')});
+                storedCards.unshift({content: content, time: currentTime});
                 saveCardsToLocalStorage(storedCards);
 
                 // 更新发送时间和计数
