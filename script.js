@@ -172,11 +172,16 @@ async function deleteCard(card, user) {
             console.log('尝试删除卡片:', card.querySelector('.card-content').textContent);
             
             // 从 LeanCloud 删除数据
-            const objectId = card.dataset.objectId;
-            if (objectId) {
-                const cardObject = AV.Object.createWithoutData('Card', objectId);
+            const query = new AV.Query('Card');
+            query.equalTo('content', card.querySelector('.card-content').textContent);
+            query.equalTo('time', card.querySelector('.card-time').textContent);
+            const cardObject = await query.first();
+            if (cardObject) {
+                console.log('在 LeanCloud 中找到卡片，尝试删除');
                 await cardObject.destroy({ user: user });
                 console.log('卡片已从 LeanCloud 成功删除');
+            } else {
+                console.log('在 LeanCloud 中未找到卡片');
             }
 
             // 从 DOM 和本地数组中删除卡片
@@ -186,12 +191,19 @@ async function deleteCard(card, user) {
 
             // 从本地存储中删除卡片
             let storedCards = loadCardsFromLocalStorage();
-            storedCards = storedCards.filter(storedCard => storedCard.objectId !== objectId);
+            storedCards = storedCards.filter(storedCard => 
+                storedCard.content !== card.querySelector('.card-content').textContent ||
+                storedCard.time !== card.querySelector('.card-time').textContent
+            );
             saveCardsToLocalStorage(storedCards);
 
             console.log('卡片已在本地删除');
         } catch (error) {
             console.error('删除卡片失败:', error);
+            console.error('错误详情:', error.message);
+            if (error.code) {
+                console.error('LeanCloud 错误代码:', error.code);
+            }
             throw error;
         }
     }
@@ -289,6 +301,12 @@ async function updateDailySendCount() {
     dailySendCount++;
 }
 
+// 新增函数：检查是否存在相同时间的卡片
+function cardExistsAtTime(time) {
+    return cards.some(card => card.querySelector('.card-time').textContent === time);
+}
+
+// 修改 addCard 函数
 async function addCard() {
     const currentTime = Date.now();
     if (currentTime - lastSendTime < sendCooldown) {
@@ -305,11 +323,19 @@ async function addCard() {
     const content = input.value.trim();
     if (content) {
         try {
+            const currentTime = new Date().toLocaleString();
+            
+            // 检查是否已存在相同时间的卡片
+            const existingCard = cards.find(card => card.querySelector('.card-time').textContent === currentTime);
+            if (existingCard) {
+                alert('该时间点已存在卡片，请稍后再试');
+                return;
+            }
+
             // 创建 LeanCloud 对象并保存
             const Card = AV.Object.extend('Card');
             const card = new Card();
             card.set('content', content);
-            const currentTime = new Date().toLocaleString();
             card.set('time', currentTime);
             
             // 设置 ACL
@@ -318,37 +344,21 @@ async function addCard() {
             acl.setPublicWriteAccess(true);
             card.setACL(acl);
             
-            const savedCard = await card.save();
-
-            // 从 LeanCloud 加载新保存的卡片
-            const query = new AV.Query('Card');
-            const fetchedCard = await query.get(savedCard.id);
+            await card.save();
 
             // 创建并显示卡片
-            const cardElement = createCard(fetchedCard.get('content'), fetchedCard.get('time'));
-            cardElement.dataset.objectId = fetchedCard.id;
+            const cardElement = createCard(content, currentTime);
             document.getElementById('card-container').prepend(cardElement);
             cards.unshift(cardElement);
             
-            // 确保卡片按时间倒序排列
-            cards.sort((a, b) => {
-                const timeA = new Date(a.querySelector('.card-time').textContent);
-                const timeB = new Date(b.querySelector('.card-time').textContent);
-                return timeB - timeA;
-            });
-            
             updateCardPositions();
-            launchRocket(); // 在成功添加卡片后触发火箭动画
+            launchRocket();
             input.value = '';
-            console.log('Card added successfully'); // 添加日志
+            console.log('Card added successfully');
 
             // 更新本地存储
             let storedCards = loadCardsFromLocalStorage();
-            storedCards.unshift({
-                content: fetchedCard.get('content'),
-                time: fetchedCard.get('time'),
-                objectId: fetchedCard.id
-            });
+            storedCards.unshift({content: content, time: currentTime});
             saveCardsToLocalStorage(storedCards);
 
             // 更新发送时间和计数
@@ -358,7 +368,7 @@ async function addCard() {
             console.error('保存卡片失败:', error);
         }
     } else {
-        console.log('No content to add'); // 添加日志
+        console.log('No content to add');
     }
 }
 
@@ -547,6 +557,7 @@ function saveCardsToLocalStorage(cards) {
     localStorage.setItem('storedCards', JSON.stringify(cards));
 }
 
+// 修改 loadCards 函数
 async function loadCards(page = 0) {
     if (isLoading || allCardsLoaded) return;
     isLoading = true;
@@ -555,21 +566,17 @@ async function loadCards(page = 0) {
         let results;
 
         if (storedCards.length > page * cardsPerPage) {
-            // 从本地存储加载卡片
             results = storedCards.slice(page * cardsPerPage, (page + 1) * cardsPerPage);
         } else {
-            // 从服务器加载新卡片
             const query = new AV.Query('Card');
             query.descending('createdAt');
             query.limit(cardsPerPage);
             query.skip(page * cardsPerPage);
             results = await query.find();
 
-            // 将新卡片添加到本地存储
             const newCards = results.map(card => ({
                 content: card.get('content'),
-                time: card.get('time'),
-                objectId: card.id
+                time: card.get('time')
             }));
             storedCards = storedCards.concat(newCards);
             saveCardsToLocalStorage(storedCards);
@@ -581,27 +588,25 @@ async function loadCards(page = 0) {
         }
 
         if (page === 0) {
-            // 清空现有卡片
             document.getElementById('card-container').innerHTML = '';
             cards = [];
         }
 
+        // 使用 Set 来存储唯一的时间点
+        const uniqueTimes = new Set();
+
         for (let cardData of results) {
             const content = cardData.get ? cardData.get('content') : cardData.content;
             const time = cardData.get ? cardData.get('time') : cardData.time;
-            const objectId = cardData.get ? cardData.id : cardData.objectId;
-            const card = createCard(content, time);
-            card.dataset.objectId = objectId;
-            document.getElementById('card-container').appendChild(card);
-            cards.push(card);
+            
+            // 如果这个时间点还没有被添加过，则添加卡片
+            if (!uniqueTimes.has(time)) {
+                const card = createCard(content, time);
+                document.getElementById('card-container').appendChild(card);
+                cards.push(card);
+                uniqueTimes.add(time);
+            }
         }
-        
-        // 确保卡片按时间倒序排列
-        cards.sort((a, b) => {
-            const timeA = new Date(a.querySelector('.card-time').textContent);
-            const timeB = new Date(b.querySelector('.card-time').textContent);
-            return timeB - timeA;
-        });
         
         updateCardPositions();
         console.log(`卡片加载完成，当前页：${page + 1}，总数：${cards.length}`);
@@ -619,6 +624,7 @@ function checkLoadMore() {
     }
 }
 
+// 修改 loadNewCards 函数
 async function loadNewCards() {
     try {
         const latestCardTime = cards.length > 0 ? cards[0].querySelector('.card-time').textContent : null;
@@ -630,14 +636,18 @@ async function loadNewCards() {
         const newCards = await query.find();
 
         if (newCards.length > 0) {
+            const uniqueTimes = new Set(cards.map(card => card.querySelector('.card-time').textContent));
+
             for (let cardData of newCards) {
                 const content = cardData.get('content');
                 const time = cardData.get('time');
-                const objectId = cardData.id;
-                const card = createCard(content, time);
-                card.dataset.objectId = objectId;
-                document.getElementById('card-container').prepend(card);
-                cards.unshift(card);
+                
+                if (!uniqueTimes.has(time)) {
+                    const card = createCard(content, time);
+                    document.getElementById('card-container').prepend(card);
+                    cards.unshift(card);
+                    uniqueTimes.add(time);
+                }
             }
             updateCardPositions();
             console.log(`新卡片加载完成，总数：${cards.length}`);
