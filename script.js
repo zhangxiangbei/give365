@@ -172,16 +172,11 @@ async function deleteCard(card, user) {
             console.log('尝试删除卡片:', card.querySelector('.card-content').textContent);
             
             // 从 LeanCloud 删除数据
-            const query = new AV.Query('Card');
-            query.equalTo('content', card.querySelector('.card-content').textContent);
-            query.equalTo('time', card.querySelector('.card-time').textContent);
-            const cardObject = await query.first();
-            if (cardObject) {
-                console.log('在 LeanCloud 中找到卡片，尝试删除');
+            const objectId = card.dataset.objectId;
+            if (objectId) {
+                const cardObject = AV.Object.createWithoutData('Card', objectId);
                 await cardObject.destroy({ user: user });
                 console.log('卡片已从 LeanCloud 成功删除');
-            } else {
-                console.log('在 LeanCloud 中未找到卡片');
             }
 
             // 从 DOM 和本地数组中删除卡片
@@ -191,19 +186,12 @@ async function deleteCard(card, user) {
 
             // 从本地存储中删除卡片
             let storedCards = loadCardsFromLocalStorage();
-            storedCards = storedCards.filter(storedCard => 
-                storedCard.content !== card.querySelector('.card-content').textContent ||
-                storedCard.time !== card.querySelector('.card-time').textContent
-            );
+            storedCards = storedCards.filter(storedCard => storedCard.objectId !== objectId);
             saveCardsToLocalStorage(storedCards);
 
             console.log('卡片已在本地删除');
         } catch (error) {
             console.error('删除卡片失败:', error);
-            console.error('错误详情:', error.message);
-            if (error.code) {
-                console.error('LeanCloud 错误代码:', error.code);
-            }
             throw error;
         }
     }
@@ -330,10 +318,15 @@ async function addCard() {
             acl.setPublicWriteAccess(true);
             card.setACL(acl);
             
-            await card.save();
+            const savedCard = await card.save();
+
+            // 从 LeanCloud 加载新保存的卡片
+            const query = new AV.Query('Card');
+            const fetchedCard = await query.get(savedCard.id);
 
             // 创建并显示卡片
-            const cardElement = createCard(content, currentTime);
+            const cardElement = createCard(fetchedCard.get('content'), fetchedCard.get('time'));
+            cardElement.dataset.objectId = fetchedCard.id;
             document.getElementById('card-container').prepend(cardElement);
             cards.unshift(cardElement);
             
@@ -351,7 +344,11 @@ async function addCard() {
 
             // 更新本地存储
             let storedCards = loadCardsFromLocalStorage();
-            storedCards.unshift({content: content, time: currentTime});
+            storedCards.unshift({
+                content: fetchedCard.get('content'),
+                time: fetchedCard.get('time'),
+                objectId: fetchedCard.id
+            });
             saveCardsToLocalStorage(storedCards);
 
             // 更新发送时间和计数
@@ -571,7 +568,8 @@ async function loadCards(page = 0) {
             // 将新卡片添加到本地存储
             const newCards = results.map(card => ({
                 content: card.get('content'),
-                time: card.get('time')
+                time: card.get('time'),
+                objectId: card.id
             }));
             storedCards = storedCards.concat(newCards);
             saveCardsToLocalStorage(storedCards);
@@ -591,7 +589,9 @@ async function loadCards(page = 0) {
         for (let cardData of results) {
             const content = cardData.get ? cardData.get('content') : cardData.content;
             const time = cardData.get ? cardData.get('time') : cardData.time;
+            const objectId = cardData.get ? cardData.id : cardData.objectId;
             const card = createCard(content, time);
+            card.dataset.objectId = objectId;
             document.getElementById('card-container').appendChild(card);
             cards.push(card);
         }
@@ -633,7 +633,9 @@ async function loadNewCards() {
             for (let cardData of newCards) {
                 const content = cardData.get('content');
                 const time = cardData.get('time');
+                const objectId = cardData.id;
                 const card = createCard(content, time);
+                card.dataset.objectId = objectId;
                 document.getElementById('card-container').prepend(card);
                 cards.unshift(card);
             }
