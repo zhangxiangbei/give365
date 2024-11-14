@@ -241,7 +241,7 @@ const maxDailySendCount = 100;
 // 获取用户IP地址的函数（需要服务器支持）
 async function getUserIP() {
     try {
-        const response = await fetch('https://www.ip.cn/api/index?ip=&type=0');
+        const response = await fetch('https://api.ipapi.is/');
         const data = await response.json();
         return data.ip;
     } catch (error) {
